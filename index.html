@@ -1,114 +1,76 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Live Voice Chat</title>
-  <style>
-    body {
-      font-family: sans-serif;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 30px;
-    }
-    #mic-indicator {
-      margin-top: 20px;
-      width: 80px;
-      height: 80px;
-      border-radius: 50%;
-      background: #3b82f6;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      position: relative;
-      color: white;
-      font-size: 32px;
-    }
-    #mic-wave {
-      position: absolute;
-      border: 4px solid #93c5fd;
-      border-radius: 50%;
-      animation: pulse 1.5s infinite;
-      opacity: 0.6;
-    }
-    @keyframes pulse {
-      0%   { transform: scale(1); opacity: 0.7; }
-      100% { transform: scale(2); opacity: 0; }
-    }
-    #log {
-      margin-top: 20px;
-      padding: 10px;
-      border: 1px solid #ccc;
-      width: 80%;
-      max-width: 500px;
-      min-height: 80px;
-      background: #f9fafb;
-      font-family: monospace;
-      white-space: pre-wrap;
-    }
-  </style>
+  <title>Simple Video Chat</title>
 </head>
 <body>
-  <h2>🎤 Live Voice Chat (Agora)</h2>
-  <button id="joinBtn">Join Channel</button>
+  <h2>Video Chat</h2>
+  <input id="username" placeholder="Ismingiz" />
+  <button id="joinBtn">Qo'shilish</button>
+  <div id="videoContainer"></div>
 
-  <div id="mic-indicator" style="display:none;">
-    <div id="mic-wave"></div>
-    🎤
-  </div>
-
-  <p id="log">Logs:\n</p>
-
-      <script src="https://cdn.agora.io/sdk/release/AgoraRTC_N.js"></script>
-
+  <script src="https://cdn.agora.io/sdk/release/AgoraRTC_N.js"></script>
   <script>
-    const APP_ID = "c5423838ad7a449c9e48d90088944c10";  // 👉 bu yerga App ID qo‘yasiz
+    const APP_ID = "c5423838ad7a449c9e48d90088944c10";
     const CHANNEL = "testChannel";
-    const TOKEN = null; // testing uchun token bo‘lmasa ham ishlaydi
 
-    const client = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
-    let localTrack;
+    const joinBtn = document.getElementById("joinBtn");
+    const videoContainer = document.getElementById("videoContainer");
 
-    // Log chiqaruvchi funksiya
-    function log(msg) {
-      document.getElementById("log").innerText += msg + "\n";
-    }
+    let client;
+    let localAudioTrack, localVideoTrack;
 
-    document.getElementById("joinBtn").onclick = async () => {
-      try {
-        log("Joining channel...");
-        await client.join(APP_ID, CHANNEL, TOKEN, null);
-        log("Joined successfully ✅");
+    joinBtn.onclick = async () => {
+      const username = document.getElementById("username").value;
+      if (!username) return alert("Ismingizni kiriting!");
 
-        localTrack = await AgoraRTC.createMicrophoneAudioTrack();
-        await client.publish([localTrack]);
-        log("Microphone published 🎤");
+      client = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
+      const uid = await client.join(APP_ID, CHANNEL, null, null);
 
-        // Mic indikatorini ko‘rsatamiz
-        document.getElementById("mic-indicator").style.display = "flex";
+      // Lokal audio va video trek
+      localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack();
+      localVideoTrack = await AgoraRTC.createCameraVideoTrack();
 
-        // Ovozni o‘lchab, mic wave ni kattalashtiramiz
-        setInterval(() => {
-          const level = localTrack.getVolumeLevel(); // 0-1 oralig‘ida
-          const micWave = document.getElementById("mic-wave");
-          micWave.style.width = `${80 + level * 100}px`;
-          micWave.style.height = `${80 + level * 100}px`;
-        }, 200);
+      // Lokal videoni ko'rsatish
+      const localPlayer = document.createElement("div");
+      localPlayer.id = `local-player-${uid}`;
+      localPlayer.style.width = "300px";
+      localPlayer.style.height = "200px";
+      videoContainer.appendChild(localPlayer);
+      localVideoTrack.play(localPlayer);
 
-        // Boshqa foydalanuvchilarni eshitish
-        client.on("user-published", async (user, mediaType) => {
-          await client.subscribe(user, mediaType);
-          if (mediaType === "audio") {
-            user.audioTrack.play();
-            log("New user joined and audio playing 🔊");
-          }
-        });
+      await client.publish([localAudioTrack, localVideoTrack]);
+      console.log("Audio va Video track published");
 
-      } catch (err) {
-        log("❌ Error: " + err.message);
-      }
+      // Boshqa foydalanuvchilarni kuzatish
+      client.on("user-published", async (user, mediaType) => {
+        await client.subscribe(user, mediaType);
+
+        if (mediaType === "video") {
+          const remotePlayer = document.createElement("div");
+          remotePlayer.id = `remote-player-${user.uid}`;
+          remotePlayer.style.width = "300px";
+          remotePlayer.style.height = "200px";
+          videoContainer.appendChild(remotePlayer);
+          user.videoTrack.play(remotePlayer);
+        }
+
+        if (mediaType === "audio") {
+          const audioTrack = user.audioTrack;
+          const audioElement = document.createElement("audio");
+          audioElement.autoplay = true;
+          audioElement.srcObject = audioTrack.mediaStream;
+          videoContainer.appendChild(audioElement);
+        }
+      });
     };
   </script>
 </body>
 </html>
+
+    };
+  </script>
+</body>
+</html>
+
